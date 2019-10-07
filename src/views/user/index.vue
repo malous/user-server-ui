@@ -1,23 +1,21 @@
 <template>
   <div class="app-container">
     <div class="filter-container">
-      <el-input v-model="listQuery.name" placeholder="姓名或账户" style="width: 300px;" class="filter-item"/>
-      <el-button style="margin-left: 100px" class="filter-item" type="primary" icon="el-icon-search">
+      <el-input v-model="listQuery.name" placeholder="姓名或账户" style="width: 300px;" class="filter-item" />
+      <el-button style="margin-left: 100px" class="filter-item" type="primary" icon="el-icon-search" @click="handleSearch()">
         Search
       </el-button>
-      <el-button class="filter-item" style="margin-left: 30px; width: 120px" type="primary" icon="el-icon-edit">
+      <el-button class="filter-item" style="margin-left: 30px; width: 120px" type="primary" icon="el-icon-edit" @click="handleAddUser()">
         Add
       </el-button>
-      <!-- <el-button v-waves :loading="downloadLoading" class="filter-item" type="primary" icon="el-icon-download" @click="handleDownload">
-        Export
-      </el-button> -->
     </div>
 
     <el-table :data="userList" style="width: 100%;margin-top:30px;" border>
-      <el-table-column align="center" prop="name" label="姓名" width="220">
-        <!-- <template slot-scope="scope">
+      <el-table-column v-if="false" prop="id" />
+      <el-table-column align="center" label="姓名" width="220">
+        <template slot-scope="scope">
           {{ scope.row.name }}
-        </template> -->
+        </template>
       </el-table-column>
       <el-table-column align="center" label="账户" width="220">
         <template slot-scope="scope">
@@ -41,34 +39,47 @@
       </el-table-column>
       <el-table-column align="center" label="操作">
         <template slot-scope="scope">
-          <el-button type="primary" size="small" @click="handleUpdate(scope.row)">编辑</el-button>
-          <el-button type="danger" size="small" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button type="primary" size="small" @click="handleUpdate(scope.row)">Edit</el-button>
+          <el-button type="danger" size="small" @click="handleDelete(scope)">Delete</el-button>
         </template>
       </el-table-column>
     </el-table>
 
+    <el-pagination
+      v-show="total>0"
+      :hide-on-single-page="true"
+      :current-page="listQuery.page"
+      :page-size="listQuery.limit"
+      layout="total, sizes, prev, pager, next, jumper"
+      :total="total"
+      style="margin-top: 20px"
+      @size-change="handleSizeChangle"
+      @current-change="handlePageChange"
+    />
+
     <el-dialog :visible.sync="dialogVisible" :title="dialogType==='edit'?'Edit User':'New User'">
-      <el-form :model="user" label-width="80px" label-position="left">
-        <el-form-item label="Name">
-          <el-input v-model="user.name" placeholder="User Name" />
+      <el-form ref="user" :model="user" :rules="userRule" label-width="80px" label-position="left">
+        <el-form-item label="账号" prop="username">
+          <el-input v-model="user.username" placeholder="Username" />
         </el-form-item>
-        <el-form-item label="Desc">
+        <el-form-item v-if="dialogType=='new'" label="密码" prop="password">
+          <el-input v-model="user.password" placeholder="Password" />
+        </el-form-item>
+        <el-form-item label="姓名" prop="name">
+          <el-input v-model="user.name" placeholder="Name" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="user.email" placeholder="Email" />
+        </el-form-item>
+        <el-form-item label="电话" prop="phone">
+          <el-input v-model="user.phone" placeholder="Phone" />
+        </el-form-item>
+        <el-form-item label="备注">
           <el-input
-            v-model="user.description"
+            v-model="user.note"
             :autosize="{ minRows: 2, maxRows: 4}"
             type="textarea"
-            placeholder="User Description"
-          />
-        </el-form-item>
-        <el-form-item label="Menus">
-          <el-tree
-            ref="tree"
-            :check-strictly="checkStrictly"
-            :data="routesData"
-            :props="defaultProps"
-            show-checkbox
-            node-key="path"
-            class="permission-tree"
+            placeholder="Note"
           />
         </el-form-item>
       </el-form>
@@ -81,94 +92,101 @@
 </template>
 
 <script>
-import path from 'path'
 import { deepClone } from '@/utils'
+import { validPhone, validEmail } from '@/utils/validate'
 import { getUsers, addUser, deleteUser, updateUser } from '@/api/user'
 
 const defaultUser = {
-  key: '',
+  username: '',
+  password: '',
   name: '',
-  description: '',
-  routes: []
+  phone: '',
+  email: '',
+  note: ''
 }
 
 export default {
   data() {
-    return {
-      listQuery: {
-        page: 1,
-        limit: 20,
-        name: undefined
-      },
-      user: Object.assign({}, defaultUser),
-      routes: [],
-      userList: [],
-      dialogVisible: false,
-      dialogType: 'new',
-      checkStrictly: false,
-      defaultProps: {
-        children: 'children',
-        label: 'title'
+    const checkPhone = (rule, value, callback) => {
+      if (value && !validPhone(value)) {
+        callback(new Error('请输入正确的电话号码'))
+      } else {
+        callback()
       }
     }
-  },
-  computed: {
-    routesData() {
-      return this.routes
+    const checkEmail = (rule, value, callback) => {
+      if (value && !validEmail(value)) {
+        callback(new Error('请输入正确的邮箱账号'))
+      } else {
+        callback()
+      }
+    }
+    return {
+      total: 0,
+      listQuery: {
+        name: undefined,
+        page: 1,
+        limit: 10
+      },
+      user: Object.assign({}, defaultUser),
+      userList: [],
+      userRule: {
+        username: [
+          { required: true, message: '请输入用户名', trigger: 'blur' }
+        ],
+        password: [
+          { required: true, message: '请输入密码', trigger: 'blur' }
+        ],
+        name: [
+          { required: true, message: '请输入用户姓名', trigger: 'blur' }
+        ],
+        phone: [
+          { required: false, trigger: 'blur', validator: checkPhone }
+        ],
+        email: [
+          { required: false, trigger: 'blur', validator: checkEmail }
+        ]
+      },
+      dialogVisible: false,
+      dialogType: 'new'
     }
   },
   created() {
-    // Mock: get all routes and users list from server
-    this.getUsers({ name: undefined, pageNum: this.listQuery.page, pageSize: this.listQuery.limit })
+    this.handleSearch()
   },
   methods: {
     async getUsers(data) {
       const res = await getUsers(data)
+      const list = []
       res.result.forEach(element => {
-        this.userList.push({
+        list.push({
           id: element.id,
           name: element.name,
           username: element.username,
           phone: element.phone,
+          email: element.email,
           note: element.note
         })
       })
+      this.userList = list
+      this.total = res.total
     },
-
-    generateArr(routes) {
-      let data = []
-      routes.forEach(route => {
-        data.push(route)
-        if (route.children) {
-          const temp = this.generateArr(route.children)
-          if (temp.length > 0) {
-            data = [...data, ...temp]
-          }
-        }
+    handleSearch() {
+      this.getUsers({
+        name: this.listQuery.name,
+        pageNum: this.listQuery.page,
+        pageSize: this.listQuery.limit
       })
-      return data
     },
-
     handleAddUser() {
-      this.user = Object.assign({}, defaultUser)
-      if (this.$refs.tree) {
-        this.$refs.tree.setCheckedNodes([])
-      }
+      this.user = Object.assign({}, this.defaultUser)
       this.dialogType = 'new'
       this.dialogVisible = true
     },
-
     handleUpdate(row) {
       this.dialogType = 'edit'
       this.dialogVisible = true
-      this.checkStrictly = true
       this.user = deepClone(row)
-      this.$nextTick(() => {
-        const routes = this.generateRoutes(this.user.routes)
-        this.$refs.tree.setCheckedNodes(this.generateArr(routes))
-        // set checked state of a node not affects its father and child nodes
-        this.checkStrictly = false
-      })
     },
     handleDelete({ $index, row }) {
       this.$confirm('Confirm to remove the user?', 'Warning', {
@@ -177,8 +195,8 @@ export default {
         type: 'warning'
       })
         .then(async() => {
-          await deleteUser(row.key)
-          this.usersList.splice($index, 1)
+          await deleteUser(row.id)
+          this.userList.splice($index, 1)
           this.$message({
             type: 'success',
             message: 'Delete succed!'
@@ -186,75 +204,54 @@ export default {
         })
         .catch(err => { console.error(err) })
     },
-    generateTree(routes, basePath = '/', checkedKeys) {
-      const res = []
-
-      for (const route of routes) {
-        const routePath = path.resolve(basePath, route.path)
-
-        // recursive child routes
-        if (route.children) {
-          route.children = this.generateTree(route.children, routePath, checkedKeys)
-        }
-
-        if (checkedKeys.includes(routePath) || (route.children && route.children.length >= 1)) {
-          res.push(route)
-        }
-      }
-      return res
-    },
-    async confirmUser() {
+    confirmUser() {
       const isEdit = this.dialogType === 'edit'
-
-      const checkedKeys = this.$refs.tree.getCheckedKeys()
-      this.user.routes = this.generateTree(deepClone(this.serviceRoutes), '/', checkedKeys)
-
       if (isEdit) {
-        await updateUser(this.user.key, this.user)
-        for (let index = 0; index < this.usersList.length; index++) {
-          if (this.usersList[index].key === this.user.key) {
-            this.usersList.splice(index, 1, Object.assign({}, this.user))
-            break
+        this.userRule.password[0].required = false
+        this.$refs.user.validate(async(valid) => {
+          if (valid) {
+            await updateUser(this.user)
+            for (let index = 0; index < this.userList.length; index++) {
+              if (this.userList[index].id === this.user.id) {
+                this.userList.splice(index, 1, Object.assign({}, this.user))
+                this.$message({
+                  type: 'success',
+                  message: '成功更新数据'
+                })
+                break
+              }
+            }
+            this.dialogVisible = false
+          } else {
+            this.$message.error('数据不符合规范，请重新填写')
+            return false
           }
-        }
+        })
       } else {
-        const { data } = await addUser(this.user)
-        this.user.key = data.key
-        this.usersList.push(this.user)
+        this.userRule.password[0].required = true
+        this.$refs.user.validate(async(valid) => {
+          if (valid) {
+            const res = await addUser(this.user)
+            this.user.id = res.result
+            delete this.user.password
+            this.userList.push(this.user)
+            this.$message({
+              message: '添加数据成功！',
+              type: 'success'
+            })
+            this.dialogVisible = false
+          } else {
+            this.$message.error('数据不符合规范，请重新填写')
+            return false
+          }
+        })
       }
-
-      const { description, key, name } = this.user
-      this.dialogVisible = false
-      this.$notify({
-        title: 'Success',
-        dangerouslyUseHTMLString: true,
-        message: `
-            <div>User Key: ${key}</div>
-            <div>User Name: ${name}</div>
-            <div>Description: ${description}</div>
-          `,
-        type: 'success'
-      })
     },
-    // reference: src/view/layout/components/Sidebar/SidebarItem.vue
-    onlyOneShowingChild(children = [], parent) {
-      let onlyOneChild = null
-      const showingChildren = children.filter(item => !item.hidden)
-
-      // When there is only one child route, the child route is displayed by default
-      if (showingChildren.length === 1) {
-        onlyOneChild = showingChildren[0]
-        onlyOneChild.path = path.resolve(parent.path, onlyOneChild.path)
-        return onlyOneChild
-      }
-
-      // Show parent if there are no child route to display
-      if (showingChildren.length === 0) {
-        onlyOneChild = { ... parent, path: '', noShowingChildren: true }
-        return onlyOneChild
-      }
-
-      return false
+    handleSizeChange() {
+      this.handleSearch()
+    },
+    handlePageChange() {
+      this.handleSearch()
     }
   }
 }

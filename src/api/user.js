@@ -37,7 +37,7 @@ export function getUsers(data) {
 
 export function addUser(data) {
   return request({
-    url: '/user/add',
+    url: '/user/insert',
     method: 'post',
     data
   })
@@ -51,10 +51,12 @@ export function updateUser(data) {
   })
 }
 
-export function deleteRole(id) {
+export function deleteUser(id) {
   return request({
     url: '/user/delete',
     method: 'delete',
-    data: id
+    params: {
+      'id': id
+    }
   })
 }

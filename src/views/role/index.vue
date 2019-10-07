@@ -1,53 +1,66 @@
 <template>
   <div class="app-container">
-    <el-button type="primary" @click="handleAddRole">New Role</el-button>
-
-    <el-table :data="rolesList" style="width: 100%;margin-top:30px;" border>
-      <el-table-column align="center" label="Role Key" width="220">
-        <template slot-scope="scope">
-          {{ scope.row.key }}
-        </template>
-      </el-table-column>
-      <el-table-column align="center" label="Role Name" width="220">
-        <template slot-scope="scope">
-          {{ scope.row.name }}
-        </template>
-      </el-table-column>
-      <el-table-column align="header-center" label="Description">
-        <template slot-scope="scope">
-          {{ scope.row.description }}
-        </template>
-      </el-table-column>
-      <el-table-column align="center" label="Operations">
-        <template slot-scope="scope">
-          <el-button type="primary" size="small" @click="handleEdit(scope)">Edit</el-button>
-          <el-button type="danger" size="small" @click="handleDelete(scope)">Delete</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <el-row style="height: 100%">
+      <el-col :span="9">
+        <el-row>
+          <el-button type="primary" @click="handleAddRole">New Role</el-button>
+          <el-button type="primary" @click="assignRole">Assign</el-button>
+        </el-row>
+        <el-table :data="roleList" style="width: 100%; margin-top:30px;" highlight-current-row border @current-change="handleTableChange">
+          <el-table-column v-if="false" prop="id" />
+          <el-table-column type="index" align="center" width="60px" />
+          <el-table-column label="角色名" align="center" width="200px">
+            <template slot-scope="scope">
+              {{ scope.row.name }}
+            </template>
+          </el-table-column>
+          <el-table-column align="center" label="操作">
+            <template slot-scope="scope">
+              <el-button type="primary" size="medium" @click="handleEditRole(scope.row)">Edit</el-button>
+              <el-button type="danger" size="medium" @click="handleDeleteRole(scope)">Delete</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-col>
+      <el-col :span="14" :offset="1">
+        <el-table :data="userRoleInfo" style="width: 100%; margin-top:50px;" border>
+          <el-table-column v-if="false" prop="id" />
+          <el-table-column type="index" align="center" width="60px" />
+          <el-table-column label="姓名" align="center">
+            <template slot-scope="scope">
+              {{ scope.row.name }}
+            </template>
+          </el-table-column>
+          <el-table-column label="账号" align="center">
+            <template slot-scope="scope">
+              {{ scope.row.username }}
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" align="center">
+            <template slot-scope="scope">
+              {{ scope.row.note }}
+            </template>
+          </el-table-column>
+          <el-table-column align="center" label="操作">
+            <template slot-scope="scope">
+              <el-button type="danger" size="medium" @click="handleDelete(scope)">Delete</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-col>
+    </el-row>
 
     <el-dialog :visible.sync="dialogVisible" :title="dialogType==='edit'?'Edit Role':'New Role'">
-      <el-form :model="role" label-width="80px" label-position="left">
-        <el-form-item label="Name">
+      <el-form ref="role" :model="role" :rules="roleRule" label-width="80px" label-position="left">
+        <el-form-item label="名称" prop="name">
           <el-input v-model="role.name" placeholder="Role Name" />
         </el-form-item>
-        <el-form-item label="Desc">
+        <el-form-item label="备注">
           <el-input
-            v-model="role.description"
+            v-model="role.note"
             :autosize="{ minRows: 2, maxRows: 4}"
             type="textarea"
             placeholder="Role Description"
-          />
-        </el-form-item>
-        <el-form-item label="Menus">
-          <el-tree
-            ref="tree"
-            :check-strictly="checkStrictly"
-            :data="routesData"
-            :props="defaultProps"
-            show-checkbox
-            node-key="path"
-            class="permission-tree"
           />
         </el-form-item>
       </el-form>
@@ -56,203 +69,225 @@
         <el-button type="primary" @click="confirmRole">Confirm</el-button>
       </div>
     </el-dialog>
+    <el-dialog :visible.sync="dialogTableVisible" title="分配角色">
+      <el-table ref="userList" :data="userList" @select="handleSelect">
+        <el-table-column v-if="false" prop="id" />
+        <el-table-column type="selection" />
+        <el-table-column align="center" label="姓名">
+          <template slot-scope="scope">
+            {{ scope.row.name }}
+          </template>
+        </el-table-column>
+        <el-table-column align="center" label="账户">
+          <template slot-scope="scope">
+            {{ scope.row.username }}
+          </template>
+        </el-table-column>
+        <el-table-column align="center" label="电话">
+          <template slot-scope="scope">
+            {{ scope.row.phone }}
+          </template>
+        </el-table-column>
+        <el-table-column align="center" label="邮箱">
+          <template slot-scope="scope">
+            {{ scope.row.email }}
+          </template>
+        </el-table-column>
+        <el-table-column align="center" label="备注">
+          <template slot-scope="scope">
+            {{ scope.row.note }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="text-align:right; margin-top: 30px">
+        <el-button @click="dialogTableVisible=false">取消</el-button>
+        <el-button type="primary" @click="confirmAssign">确认</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import path from 'path'
 import { deepClone } from '@/utils'
-import { getRoutes, getRoles, addRole, deleteRole, updateRole } from '@/api/role'
+import { getUsers } from '@/api/user'
+import { getRoles, addRole, deleteRole, updateRole, getUserByRole, assignRole, deleteUserRole } from '@/api/role'
 
 const defaultRole = {
-  key: '',
-  name: '',
-  description: '',
-  routes: []
+  id: undefined,
+  name: undefined,
+  note: undefined
 }
 
 export default {
   data() {
     return {
       role: Object.assign({}, defaultRole),
-      routes: [],
-      rolesList: [],
+      roleList: [],
+      roleRule: {
+        name: [
+          { required: true, message: '请输入用户姓名', trigger: 'blur' }
+        ]
+      },
+      currentRow: undefined,
+      userRoleInfo: [],
+      userList: [],
       dialogVisible: false,
       dialogType: 'new',
-      checkStrictly: false,
-      defaultProps: {
-        children: 'children',
-        label: 'title'
-      }
-    }
-  },
-  computed: {
-    routesData() {
-      return this.routes
+      dialogTableVisible: false
     }
   },
   created() {
-    // Mock: get all routes and roles list from server
-    this.getRoutes()
     this.getRoles()
   },
   methods: {
-    async getRoutes() {
-      const res = await getRoutes()
-      this.serviceRoutes = res.data
-      this.routes = this.generateRoutes(res.data)
-    },
     async getRoles() {
       const res = await getRoles()
-      this.rolesList = res.data
-    },
-
-    // Reshape the routes structure so that it looks the same as the sidebar
-    generateRoutes(routes, basePath = '/') {
-      const res = []
-
-      for (let route of routes) {
-        // skip some route
-        if (route.hidden) { continue }
-
-        const onlyOneShowingChild = this.onlyOneShowingChild(route.children, route)
-
-        if (route.children && onlyOneShowingChild && !route.alwaysShow) {
-          route = onlyOneShowingChild
-        }
-
-        const data = {
-          path: path.resolve(basePath, route.path),
-          title: route.meta && route.meta.title
-
-        }
-
-        // recursive child routes
-        if (route.children) {
-          data.children = this.generateRoutes(route.children, data.path)
-        }
-        res.push(data)
-      }
-      return res
-    },
-    generateArr(routes) {
-      let data = []
-      routes.forEach(route => {
-        data.push(route)
-        if (route.children) {
-          const temp = this.generateArr(route.children)
-          if (temp.length > 0) {
-            data = [...data, ...temp]
-          }
-        }
+      const list = []
+      res.result.forEach(element => {
+        list.push({
+          id: element.id,
+          name: element.name,
+          note: element.note
+        })
       })
-      return data
+      this.roleList = list
+    },
+    async getUsers() {
+      const data = { pageNum: 1, pageSize: 100 }
+      const res = await getUsers(data)
+      const list = []
+      res.result.forEach(element => {
+        list.push({
+          id: element.id,
+          name: element.name,
+          username: element.username,
+          phone: element.phone,
+          email: element.email,
+          note: element.note
+        })
+      })
+      this.userList = list
     },
     handleAddRole() {
       this.role = Object.assign({}, defaultRole)
-      if (this.$refs.tree) {
-        this.$refs.tree.setCheckedNodes([])
-      }
       this.dialogType = 'new'
       this.dialogVisible = true
     },
-    handleEdit(scope) {
+    handleEditRole(row) {
       this.dialogType = 'edit'
       this.dialogVisible = true
-      this.checkStrictly = true
-      this.role = deepClone(scope.row)
-      this.$nextTick(() => {
-        const routes = this.generateRoutes(this.role.routes)
-        this.$refs.tree.setCheckedNodes(this.generateArr(routes))
-        // set checked state of a node not affects its father and child nodes
-        this.checkStrictly = false
-      })
+      this.role = deepClone(row)
     },
-    handleDelete({ $index, row }) {
+    handleDeleteRole({ $index, row }) {
       this.$confirm('Confirm to remove the role?', 'Warning', {
         confirmButtonText: 'Confirm',
         cancelButtonText: 'Cancel',
         type: 'warning'
       })
         .then(async() => {
-          await deleteRole(row.key)
-          this.rolesList.splice($index, 1)
+          await deleteRole(row.id)
+          this.roleList.splice($index, 1)
           this.$message({
             type: 'success',
-            message: 'Delete succed!'
+            message: '成功删除数据'
           })
         })
         .catch(err => { console.error(err) })
     },
-    generateTree(routes, basePath = '/', checkedKeys) {
-      const res = []
-
-      for (const route of routes) {
-        const routePath = path.resolve(basePath, route.path)
-
-        // recursive child routes
-        if (route.children) {
-          route.children = this.generateTree(route.children, routePath, checkedKeys)
-        }
-
-        if (checkedKeys.includes(routePath) || (route.children && route.children.length >= 1)) {
-          res.push(route)
-        }
-      }
-      return res
-    },
-    async confirmRole() {
+    confirmRole() {
       const isEdit = this.dialogType === 'edit'
-
-      const checkedKeys = this.$refs.tree.getCheckedKeys()
-      this.role.routes = this.generateTree(deepClone(this.serviceRoutes), '/', checkedKeys)
-
       if (isEdit) {
-        await updateRole(this.role.key, this.role)
-        for (let index = 0; index < this.rolesList.length; index++) {
-          if (this.rolesList[index].key === this.role.key) {
-            this.rolesList.splice(index, 1, Object.assign({}, this.role))
-            break
+        this.$refs.role.validate(async(valid) => {
+          if (valid) {
+            await updateRole(this.role)
+            for (let index = 0; index < this.roleList.length; index++) {
+              if (this.roleList[index].id === this.role.id) {
+                this.roleList.splice(index, 1, Object.assign({}, this.role))
+                this.$message({
+                  type: 'success',
+                  message: '成功更新数据'
+                })
+                break
+              }
+            }
+            this.dialogVisible = false
+          } else {
+            this.$message.error('数据不符合规范，请重新填写')
+            return false
           }
-        }
+        })
       } else {
-        const { data } = await addRole(this.role)
-        this.role.key = data.key
-        this.rolesList.push(this.role)
+        this.$refs.role.validate(async(valid) => {
+          if (valid) {
+            const res = await addRole(this.role)
+            this.role.id = res.result
+            this.roleList.push(this.role)
+            this.$message({
+              message: '添加数据成功！',
+              type: 'success'
+            })
+            this.dialogVisible = false
+          } else {
+            this.$message.error('数据不符合规范，请重新填写')
+            return false
+          }
+        })
       }
-
-      const { description, key, name } = this.role
-      this.dialogVisible = false
-      this.$notify({
-        title: 'Success',
-        dangerouslyUseHTMLString: true,
-        message: `
-            <div>Role Key: ${key}</div>
-            <div>Role Name: ${name}</div>
-            <div>Description: ${description}</div>
-          `,
-        type: 'success'
-      })
     },
-    // reference: src/view/layout/components/Sidebar/SidebarItem.vue
-    onlyOneShowingChild(children = [], parent) {
-      let onlyOneChild = null
-      const showingChildren = children.filter(item => !item.hidden)
-
-      // When there is only one child route, the child route is displayed by default
-      if (showingChildren.length === 1) {
-        onlyOneChild = showingChildren[0]
-        onlyOneChild.path = path.resolve(parent.path, onlyOneChild.path)
-        return onlyOneChild
+    async handleTableChange(row) {
+      this.currentRow = row
+      const res = await getUserByRole(row.id)
+      this.userRoleInfo = res.result
+    },
+    assignRole() {
+      if (this.currentRow) {
+        this.getUsers()
+        this.dialogTableVisible = true
+      } else {
+        this.$message({
+          type: 'warning',
+          message: '请先选择一个角色'
+        })
       }
-
-      // Show parent if there are no child route to display
-      if (showingChildren.length === 0) {
-        onlyOneChild = { ... parent, path: '', noShowingChildren: true }
-        return onlyOneChild
+    },
+    async confirmAssign() {
+      const roleId = this.currentRow.id
+      const userList = this.$refs.userList.selection
+      const list = []
+      userList.forEach(user => {
+        list.push({
+          'userId': user.id,
+          'roleId': roleId
+        })
+      })
+      const res = await assignRole(list)
+      if (res.code === 200) {
+        this.$message({
+          type: 'success',
+          message: '操作成功'
+        })
+        const data = await getUserByRole(roleId)
+        this.userRoleInfo = data.result
+        this.dialogTableVisible = false
+      } else {
+        this.$message.error(res.msg)
       }
-
-      return false
+    },
+    handleDelete({ $index, row }) {
+      this.$confirm('是否确认删除该用户角色?', 'Warning', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+        .then(async() => {
+          await deleteUserRole(row.id)
+          this.userRoleInfo.splice($index, 1)
+          this.$message({
+            type: 'success',
+            message: '删除成功!'
+          })
+        })
+        .catch(err => { console.error(err) })
     }
   }
 }
@@ -260,7 +295,7 @@ export default {
 
 <style lang="scss" scoped>
 .app-container {
-  .roles-table {
+  .role-table {
     margin-top: 30px;
   }
   .permission-tree {

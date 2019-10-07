@@ -9,22 +9,22 @@ export function getRoutes() {
 
 export function getRoles() {
   return request({
-    url: '/roles',
+    url: '/role/find',
     method: 'get'
   })
 }
 
 export function addRole(data) {
   return request({
-    url: '/role',
+    url: '/role/insert',
     method: 'post',
     data
   })
 }
 
-export function updateRole(id, data) {
+export function updateRole(data) {
   return request({
-    url: `/role/${id}`,
+    url: '/role/update',
     method: 'put',
     data
   })
@@ -32,7 +32,38 @@ export function updateRole(id, data) {
 
 export function deleteRole(id) {
   return request({
-    url: `/role/${id}`,
-    method: 'delete'
+    url: '/role/delete',
+    method: 'delete',
+    params: {
+      'id': id
+    }
+  })
+}
+
+export function getUserByRole(id) {
+  return request({
+    url: '/assign/find',
+    method: 'get',
+    params: {
+      'roleId': id
+    }
+  })
+}
+
+export function assignRole(data) {
+  return request({
+    url: '/assign/insert',
+    method: 'post',
+    data
+  })
+}
+
+export function deleteUserRole(id) {
+  return request({
+    url: '/assign/delete',
+    method: 'delete',
+    params: {
+      'id': id
+    }
   })
 }
